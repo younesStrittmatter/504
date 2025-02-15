@@ -137,18 +137,19 @@ ggplot(poly_long, aes(x = opinion, y = proportion_o, fill = polviews)) +
 
 > Which political view occurs most frequently in this data set?
 >
-> \_\_\_\_\_
+> Moderate
 
 > Make a plot displaying the relationship between satisfaction with mass transportation spending and political views. Use the plot to describe the relationship the two variables.
 
 ```{r}
 # Plot the relationship between satisfaction with mass transportation spending and political views
-ggplot(data, aes(x = polviews, fill = mass_trans_spend_right)) +
+ggplot(data, aes(x = polviews, fill = as.factor(mass_trans_spend_right))) +
   geom_bar(position = "fill") +
   labs(title = "Relationship between Political Views and Satisfaction with Mass Transportation Spending",
        x = "Political Views",
        y = "Proportion",
        fill = "Satisfaction with Spending") +
+  scale_fill_manual(values = c("0" = "red", "1" = "green"), labels = c("Not Satisfied", "Satisfied")) +
   theme_minimal()
 ```
 
