@@ -68,7 +68,7 @@ library(here)
 
 ```{r}
 # Set the working directory
-setwd(here::here("pages/logisitc-regression"))
+setwd(here::here("pages/logistic-regression"))
 # load data
 data <- read.csv("gss2016.csv")
 # look at the data 
