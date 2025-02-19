@@ -21,6 +21,8 @@ format:
 engine: knitr
 ---
 
+# Logistic Regression
+
 ## Data: General Social Survey
 
 The General Social Survey (GSS) has been used to measure trends in attitudes and behaviors in American society since 1972. In addition to collecting demographic information, the survey includes questions used to gauge attitudes about government spending priorities, confidence in institutions, lifestyle, and many other topics. A full description of the survey may be found here.

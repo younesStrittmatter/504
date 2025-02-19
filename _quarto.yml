@@ -14,6 +14,8 @@ website:
         text: Home
       - href: pages/logistic-regression/index.qmd
         text: Logistic Regression
+      - href: pages/ordinal-regression/index.qmd
+        text: Ordinal Regression
       - href: about.qmd
         text: About
       

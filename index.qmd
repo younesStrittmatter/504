@@ -2,6 +2,6 @@
 title: "504"
 ---
 
-This is a Quarto website.
+This is a Quarto website for the 504 course in the Department of Psychology at Princeton.
 
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
+The course is taught by Professor Uri Hasson.
