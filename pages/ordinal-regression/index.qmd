@@ -71,7 +71,7 @@ library(knitr)
 gbbo <- read_csv("https://raw.githubusercontent.com/suyoghc/PSY-504_Spring-2025/refs/heads/main/Ordinal%20Regression/data/GBBO.csv")
 
 # Filter to keep only the top 3 ranks
-gbbo <- gbbo %>% filter(`Technical Rank` %in% c(1, 2, 3))
+gb <- gbbo %>% filter(`Technical Rank` %in% c(1, 2, 3))
 
 ```
 
@@ -81,7 +81,7 @@ gbbo <- gbbo %>% filter(`Technical Rank` %in% c(1, 2, 3))
 
 ```{r}
 # Plot percentage of bakers in each rank by Gender
-gbbo %>%
+gb %>%
   group_by(Gender, `Technical Rank`) %>%
   summarise(count = n()) %>%
   mutate(percentage = count / sum(count) * 100) %>%
@@ -107,75 +107,74 @@ gbbo %>%
 
 -   If you haven't already, convert the outcome variable to an ordered factor. What does the order here represent?
 
-    ```{r}
-    # Convert the outcome variable to an ordered factor
-    gbbo$`Technical Rank` <- factor(gbbo$`Technical Rank`, levels = c(1, 2, 3), ordered = TRUE)
-    # The order here represents the rank in technical, with 1 being the highest rank and 3 being the lowest among the top 3.
-    ```
+```{r}
+# Convert the outcome variable to an ordered factor
+gb$Technical_Rank <- factor(gb$`Technical Rank`, levels = c(1, 2, 3), ordered = TRUE)
+# The order here represents the rank in technical, with 1 being the highest rank and 3 being the lowest among the top 3.
+```
 
 -   Convert input variables to categorical factors as appropriate.
 
-   ```{r}
+```{r}
 # Convert input variables to categorical factors as appropriate
-gbbo$Gender <- as.factor(gbbo$Gender)
-gbbo$Age <- as.factor(gbbo$Age)
+gb$Gender <- as.factor(gb$Gender)
 ```
+
 -   Run a ordinal logistic regression model against all relevant input variables. Interpret the effects for `Gender`, `Age` and `Gender*Age` (even if they are non-significant).
 
 ```{r}
 # Run an ordinal logistic regression model
-model <- clm(`Technical Rank` ~ Gender * Age, data = gbbo)
+model <- clm(Technical_Rank ~ Gender * Age, data = gb)
 
 # Display the summary of the model
 summary(model)
-
-# Interpretation:
-# The coefficients for Gender, Age, and Gender*Age interaction can be interpreted as the log odds of being in a higher rank category.
-# A positive coefficient indicates higher odds of being in a higher rank category, while a negative coefficient indicates lower odds.
-# The significance of the coefficients can be assessed using the p-values.
 ```
 
+# Interpretation:
+The coefficients for Gender, Age, and Gender*Age interaction can be interpreted as the log odds of being in a higher rank category. Meaning gender w hase a negative effect on technical rank (same as age.)
+
+The interaction effect between gender and m meaning age has a bigger effect in w then in m.
 
 -   Test if the interaction is warranted
 
-#Hint: You need to create two models with clm(); one with interaction and one without.
-#Then you compare them using the anova test using anova()
+# Hint: You need to create two models with clm(); one with interaction and one without.
+# Then you compare them using the anova test using anova()
 
-    ```{r}
-    # Model with interaction
-    model_interaction <- clm(`Technical Rank` ~ Gender * Age, data = gbbo)
-    
-    # Model without interaction
-    model_no_interaction <- clm(`Technical Rank` ~ Gender + Age, data = gbbo)
-    
-    # Compare the models using anova
-    anova(model_interaction, model_no_interaction)
-    ```
+```{r}
+# Model with interaction
+model_interaction <- clm(Technical_Rank ~ Gender * Age, data = gb)
+
+# Model without interaction
+model_no_interaction <- clm(Technical_Rank ~ Gender + Age, data = gb)
+
+# Compare the models using anova
+anova(model_interaction, model_no_interaction)
+```
 
 
 -   Use `ggemmeans` to create a figure showing the interaction between `Gender` and `Age` as a function of rank. Plot predicted probabilities from the model.
 
-  ```{r}
-  # Use ggemmeans to create a figure showing the interaction between Gender and Age as a function of rank
-  library(ggeffects)
-  
-  # Get predicted probabilities from the model
-  predicted_probs <- ggemmeans(model, terms = c("Age", "Gender"))
-  
-  # Plot the predicted probabilities
-  plot(predicted_probs) +
-    labs(title = "Predicted Probabilities of Technical Rank by Age and Gender",
-       x = "Age",
-       y = "Predicted Probability",
-       color = "Gender") +
-    theme_minimal()
-  ```
+```{r}
+# Use ggemmeans to create a figure showing the interaction between Gender and Age as a function of rank
+library(ggeffects)
+
+# Get predicted probabilities from the model
+predicted_probs <- ggemmeans(model, terms = c("Age", "Gender"))
+
+# Plot the predicted probabilities
+plot(predicted_probs) +
+  labs(title = "Predicted Probabilities of Technical Rank by Age and Gender",
+     x = "Age",
+     y = "Predicted Probability",
+     color = "Gender") +
+  theme_minimal()
+```
 
 ### Latent Visualization
 
 ```{r}
 
-ols_clm = MASS::polr(Rank~Gender*Age, data=gb)
+ols_clm = MASS::polr(Technical_Rank~Gender*Age, data=gb)
 
 ggeffect(ols_clm, c("Age[all]", "Gender"), latent=TRUE) %>% plot()
 
@@ -183,11 +182,9 @@ ggeffect(ols_clm, c("Age[all]", "Gender"), latent=TRUE) %>% plot()
 
 -   Use the Brant test to support or reject the hypothesis that the proportional odds assumption holds for your simplified model.
 
-    ```{r}
-
-    brant.test(ols_clm)
-
-    ```
+```{r}
+brant.test(ols_clm)
+```
 
     ## `brms`
 
@@ -211,16 +208,15 @@ Comparing results:
 - The `brms` model may provide more robust estimates in the presence of small sample sizes or complex hierarchical structures due to its Bayesian framework.
 
 ```{r}
-#| results: hide
-#| 
-  ols2_brm = brm(Rank ~  Gender*Age, data=gb, family = cumulative, cores = 4,chains = 4)
+
+ols2_brm = brm(Technical_Rank ~  Gender*Age, data=gb, family = cumulative, cores = 4,chains = 4)
 ```
 
 -  The `conditional_effects` function is used to plot predicted probabilities by Gender and Age across each rank. 
 
-    ```{r}
-    conditional_effects(ols2_brm, categorical = T)
-    ```
+```{r}
+conditional_effects(ols2_brm, categorical = T)
+```
 
 - `check_predictions` from the `easystats` `performance` package is used for examining model fit (i.e., does the data fit the model being used?). 
 Run the below code. What do you think?
@@ -228,3 +224,5 @@ Run the below code. What do you think?
 ```{r}
 check_predictions(ols2_brm)
 ```
+
+It fits the data. The observed data is within the predicted data points.

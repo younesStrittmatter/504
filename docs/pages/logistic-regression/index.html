@@ -161,6 +161,10 @@ window.Quarto = {
 <span class="menu-text">Logistic Regression</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="../../pages/ordinal-regression/index.html"> 
+<span class="menu-text">Ordinal Regression</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="../../about.html"> 
 <span class="menu-text">About</span></a>
   </li>  
@@ -180,9 +184,11 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#data-general-social-survey" id="toc-data-general-social-survey" class="nav-link active" data-scroll-target="#data-general-social-survey">Data: General Social Survey</a></li>
+  <li><a href="#logistic-regression" id="toc-logistic-regression" class="nav-link active" data-scroll-target="#logistic-regression">Logistic Regression</a>
+  <ul class="collapse">
+  <li><a href="#data-general-social-survey" id="toc-data-general-social-survey" class="nav-link" data-scroll-target="#data-general-social-survey">Data: General Social Survey</a></li>
   <li><a href="#eda" id="toc-eda" class="nav-link" data-scroll-target="#eda">EDA</a></li>
-  <li><a href="#logistic-regression" id="toc-logistic-regression" class="nav-link" data-scroll-target="#logistic-regression">Logistic regression</a></li>
+  <li><a href="#logistic-regression-1" id="toc-logistic-regression-1" class="nav-link" data-scroll-target="#logistic-regression-1">Logistic regression</a></li>
   <li><a href="#marginal-effects" id="toc-marginal-effects" class="nav-link" data-scroll-target="#marginal-effects">Marginal effects</a></li>
   <li><a href="#model-comparison" id="toc-model-comparison" class="nav-link" data-scroll-target="#model-comparison">Model comparison</a></li>
   <li><a href="#visualization" id="toc-visualization" class="nav-link" data-scroll-target="#visualization">Visualization</a></li>
@@ -190,6 +196,7 @@ window.Quarto = {
   <li><a href="#model-fit" id="toc-model-fit" class="nav-link" data-scroll-target="#model-fit">Model fit</a></li>
   <li><a href="#testing-polviews" id="toc-testing-polviews" class="nav-link" data-scroll-target="#testing-polviews">Testing Polviews</a></li>
   <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -222,6 +229,8 @@ window.Quarto = {
 </header>
 
 
+<section id="logistic-regression" class="level1">
+<h1>Logistic Regression</h1>
 <section id="data-general-social-survey" class="level2">
 <h2 class="anchored" data-anchor-id="data-general-social-survey">Data: General Social Survey</h2>
 <p>The General Social Survey (GSS) has been used to measure trends in attitudes and behaviors in American society since 1972. In addition to collecting demographic information, the survey includes questions used to gauge attitudes about government spending priorities, confidence in institutions, lifestyle, and many other topics. A full description of the survey may be found here.</p>
@@ -434,8 +443,8 @@ window.Quarto = {
 </div>
 </div>
 </section>
-<section id="logistic-regression" class="level2">
-<h2 class="anchored" data-anchor-id="logistic-regression">Logistic regression</h2>
+<section id="logistic-regression-1" class="level2">
+<h2 class="anchored" data-anchor-id="logistic-regression-1">Logistic regression</h2>
 <blockquote class="blockquote">
 <p>Let’s start by fitting a logistic regression model with just the intercept</p>
 </blockquote>
@@ -699,7 +708,7 @@ window.Quarto = {
 {
     UseMethod("ci")
 }
-&lt;bytecode: 0x104783a58&gt;
+&lt;bytecode: 0x11b49c0e8&gt;
 &lt;environment: namespace:bayestestR&gt;</code></pre>
 </div>
 </div>
@@ -1369,6 +1378,7 @@ Tests are performed on the log odds ratio scale </code></pre>
 </div>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->
