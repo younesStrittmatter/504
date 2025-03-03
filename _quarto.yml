@@ -16,6 +16,8 @@ website:
         text: Logistic Regression
       - href: pages/ordinal-regression/index.qmd
         text: Ordinal Regression
+      - href: pages/miltinomial-regression/index.qmd
+        text: Multinomial Regression
       - href: about.qmd
         text: About
       
