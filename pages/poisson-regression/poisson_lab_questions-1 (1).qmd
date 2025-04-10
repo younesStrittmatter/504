@@ -1,0 +1,198 @@
+---
+title: "Lab 5 - Poisson - Questions"
+author:
+    date: last-modified
+    format:
+      html:
+        self-contained: true
+        anchor-sections: true
+        code-tools: true
+        code-fold: true
+        fig-width: 8
+        fig-height: 4
+        code-block-bg: "#f1f3f5"
+        code-block-border-left: "#31BAE9"
+        mainfont: Source Sans Pro
+        theme: journal
+        toc: true
+        toc-depth: 3
+        toc-location: left
+        captions: true
+        cap-location: margin
+        table-captions: true
+        tbl-cap-location: margin
+        reference-location: margin
+      pdf:
+        pdf-engine: lualatex
+        toc: false
+        number-sections: true
+        number-depth: 2
+        top-level-division: section
+        reference-location: document
+        listings: false
+        header-includes:
+          \usepackage{marginnote, here, relsize, needspace, setspace}
+          \def\it{\emph}
+execute:
+  freeze: auto
+  echo: true
+  message: false
+  warning: false
+  fig-align: center
+  fig-width: 12
+  fig-height: 8
+  editor_options: 
+  chunk_output_type: inline
+  code-overflow: wrap
+  html:
+    code-fold: true
+    code-tools: true
+---
+
+1.  To complete this lab:
+
+-   Load packages
+
+```{r}
+library(MASS)
+library(tidyverse)
+library(emmeans)
+library(ggeffects)
+library(easystats)
+library(performance)
+library(knitr)
+```
+
+- Download the dataset:
+
+```{r}
+
+library(tidyverse)
+
+data <- read_delim("https://raw.githubusercontent.com/jgeller112/psy504-advanced-stats/main/slides/Poisson/data/2010.csv")
+
+```
+
+2. Conduct the analysis described in the preregistration document
+
+a.  The number of hours per week that a person spends on the Internet ("WWWHR") will\
+    be predicted by their vocabulary ("WORDSUM"), age ("AGE"), sex ("SEX"), religiosity\
+    ("RELITEN"), political orientation ("POLVIEWS"), and how often they work from home\
+    ("WRKHOME").
+
+
+- Let's use the `naniar` package's function `replace_with_na`to clean the data. 
+
+```{r}
+library(naniar)
+
+data_pos <- data %>%
+  dplyr::select(wwwhr, wordsum, age, sex, reliten, polviews, wrkhome) %>%
+replace_with_na(.,
+             replace = list(wwwhr = c(-1, 998, 999),
+                          wordsum = c(-1, 99),
+                          reliten = c(0, 8, 9), 
+             polviews = c(0, 8, 9), 
+             wrkhome = c(0,8,9), 
+             age=c(0, 98, 99)))
+```
+Q: Can you explain what might be going on in the above code?
+
+A: ____________
+
+
+
+Q: The next step in data cleaning would be to ensure that the data in your code are aligned with the description/ usage context of the variables
+
+- Recode sex and reliten as necessary
+
+```{r}
+
+
+```
+## Missingness
+```{r}
+data_pos %>%
+  dplyr::select(reliten, reliten_recode)
+
+
+library(skimr)
+skimr::skim(data_pos)
+
+```
+
+
+## Fit a Poisson model to the data.
+
+```{r}
+
+
+
+```
+## Carry out model checking
+
+Hint: performance package has the function you're looking for
+
+```{r}
+
+```
+
+## Find any outliers
+
+```{r}
+
+```
+
+## Refit the model after excludint outliers
+
+```{r}
+
+```
+
+```{r}
+model_parameters(your_model) %>%
+  print_html()
+```
+
+### Check for Overdispersion 
+
+Hint: performance package has the function you're looking for
+```{r}
+
+```
+
+What do you notice?
+And what's a good next step forward?
+Can there be another model class that can fit the data? If so, fit this model to the data. 
+
+```{r}
+
+```
+
+## Which one is better- your earlier model, or later model?
+
+```{r}
+
+```
+
+## What is zero inflation? Is there zero-inflation in your chosen model?
+```{r}
+
+```
+
+::: panel-tabset
+## Log Lambda
+
+```{r}
+
+
+```
+
+## Mean Count
+
+```{r}
+
+```
+:::
+
+## Report your conclusions
