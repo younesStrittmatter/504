@@ -1,5 +1,5 @@
 ---
-title: "Lab: Logistic Regression"
+title: "Logistic Regression"
 subtitle: "Princeton University"
 author: "Younes Strittmatter"
 output: 

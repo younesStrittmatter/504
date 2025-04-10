@@ -1,46 +1,24 @@
 ---
-    title: "Lab 4 - Multinomial Regression "
-    author:
-      - name: Younes Strittmatter
-    date: last-modified
-    format:
-      html:
-        self-contained: true
-        anchor-sections: true
-        code-tools: true
-        code-fold: true
-        fig-width: 8
-        fig-height: 4
-        code-block-bg: "#f1f3f5"
-        code-block-border-left: "#31BAE9"
-        mainfont: Source Sans Pro
-        theme: journal
-        toc: true
-        toc-depth: 3
-        toc-location: left
-        captions: true
-        cap-location: margin
-        table-captions: true
-        tbl-cap-location: margin
-        reference-location: margin
-      pdf:
-        pdf-engine: lualatex
-        toc: false
-        number-sections: true
-        number-depth: 2
-        top-level-division: section
-        reference-location: document
-        listings: false
-        header-includes:
-          \usepackage{marginnote, here, relsize, needspace, setspace}
-          \def\it{\emph}
-
-    comments:
-      hypothesis: false
-
-    execute:
-      warning: false
-      message: false
+title: "Multinomial Regression "
+subtitle: "Princeton University"
+author: "Younes Strittmatter"
+output: 
+  tufte::tufte_html:
+    css: 
+    tufte_variant: "envisioned"
+    highlight: github-dark
+    fig_height: 10
+    fig_width: 16
+    toc: true
+    toc_depth: 1
+execute: 
+  message: false
+  warning: false
+format: 
+  html:
+    code-fold: true
+    code-overflow: wrap
+engine: knitr
 ---
 
 Lab Goal: Predict voting frequency using demographic variables

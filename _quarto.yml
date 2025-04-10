@@ -18,6 +18,8 @@ website:
         text: Ordinal Regression
       - href: pages/multinomial-regression/index.qmd
         text: Multinomial Regression
+      - href: pages/poisson-regression/index.qmd
+        text: Poisson Regression
       - href: about.qmd
         text: About
       

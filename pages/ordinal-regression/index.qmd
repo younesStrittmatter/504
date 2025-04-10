@@ -1,5 +1,5 @@
 ---
-title: "Ordinal Regression Lab Answers"
+title: "Ordinal Regression"
 subtitle: "Princeton University"
 author: "Younes Strittmatter"
 output: 

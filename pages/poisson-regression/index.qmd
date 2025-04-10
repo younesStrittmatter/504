@@ -14,6 +14,8 @@ output:
 execute: 
   message: false
   warning: false
+  cache: false
+  freeze: false
 format: 
   html:
     code-fold: true
@@ -88,7 +90,7 @@ data_pos <- data_pos %>%
   # Recode 'reliten' into a factor with meaningful labels
  data_pos <- data_pos %>%
   mutate(
-    reliten = factor(reliten, levels = c(1, 2, 3, 4),
+    reliten_recode = factor(reliten, levels = c(1, 2, 3, 4),
                      labels = c("Extremely important", "Very important", 
                                 "Somewhat important", "Not very important"),
                      ordered = TRUE)
@@ -97,6 +99,7 @@ data_pos <- data_pos %>%
 ```
 ## Missingness
 ```{r}
+
 data_pos %>%
   dplyr::select(reliten, reliten_recode)
 
@@ -159,7 +162,7 @@ summary(poisson_model_refit)
 ```
 
 ```{r}
-model_parameters(your_model) %>%
+model_parameters(poisson_model_refit) %>%
   print_html()
 ```
 
