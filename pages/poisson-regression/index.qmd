@@ -1,0 +1,253 @@
+---
+title: "Poission Regression"
+subtitle: "Princeton University"
+author: "Younes Strittmatter"
+output: 
+  tufte::tufte_html:
+    css: 
+    tufte_variant: "envisioned"
+    highlight: github-dark
+    fig_height: 10
+    fig_width: 16
+    toc: true
+    toc_depth: 1
+execute: 
+  message: false
+  warning: false
+format: 
+  html:
+    code-fold: true
+    code-overflow: wrap
+engine: knitr
+---
+
+1.  To complete this lab:
+
+-   Load packages
+
+```{r}
+library(MASS)
+library(tidyverse)
+library(emmeans)
+library(ggeffects)
+library(easystats)
+library(performance)
+library(knitr)
+```
+
+- Download the dataset:
+
+```{r}
+
+library(tidyverse)
+
+data <- read_delim("https://raw.githubusercontent.com/jgeller112/psy504-advanced-stats/main/slides/Poisson/data/2010.csv")
+
+```
+
+2. Conduct the analysis described in the preregistration document
+
+a.  The number of hours per week that a person spends on the Internet ("WWWHR") will\
+    be predicted by their vocabulary ("WORDSUM"), age ("AGE"), sex ("SEX"), religiosity\
+    ("RELITEN"), political orientation ("POLVIEWS"), and how often they work from home\
+    ("WRKHOME").
+
+
+- Let's use the `naniar` package's function `replace_with_na`to clean the data. 
+
+```{r}
+library(naniar)
+
+data_pos <- data %>%
+  dplyr::select(wwwhr, wordsum, age, sex, reliten, polviews, wrkhome) %>%
+replace_with_na(.,
+             replace = list(wwwhr = c(-1, 998, 999),
+                          wordsum = c(-1, 99),
+                          reliten = c(0, 8, 9), 
+             polviews = c(0, 8, 9), 
+             wrkhome = c(0,8,9), 
+             age=c(0, 98, 99)))
+```
+Q: Can you explain what might be going on in the above code?
+
+A: Focuses on a subset of columns from the original dataset.
+Replaces specific "invalid" or "placeholder" values (e.g., -1, 998, 999) with NA to mark them as missing data.
+
+
+
+Q: The next step in data cleaning would be to ensure that the data in your code are aligned with the description/ usage context of the variables
+
+- Recode sex and reliten as necessary
+
+```{r}
+data_pos <- data_pos %>%
+  mutate(
+    sex = factor(sex, levels = c(1, -1), labels = c("Male", "Female"))
+  )
+  
+  # Recode 'reliten' into a factor with meaningful labels
+ data_pos <- data_pos %>%
+  mutate(
+    reliten = factor(reliten, levels = c(1, 2, 3, 4),
+                     labels = c("Extremely important", "Very important", 
+                                "Somewhat important", "Not very important"),
+                     ordered = TRUE)
+  )
+
+```
+## Missingness
+```{r}
+data_pos %>%
+  dplyr::select(reliten, reliten_recode)
+
+
+library(skimr)
+skimr::skim(data_pos)
+
+```
+
+```{r}
+table(data_pos$sex, useNA = "ifany")
+
+```
+
+
+## Fit a Poisson model to the data.
+
+```{r}
+poisson_model <- glm(wwwhr ~ wordsum + age + sex + reliten + polviews + wrkhome, 
+                     data = data_pos, 
+                     family = poisson)
+
+```
+## Carry out model checking
+
+Hint: performance package has the function you're looking for
+
+```{r}
+# Model checking using the performance package
+library(performance)
+
+check_model(poisson_model)
+```
+
+## Find any outliers
+
+```{r}
+# Find outliers
+outliers <- check_outliers(poisson_model)
+
+# View what `outliers` contains
+str(outliers)
+```
+
+## Refit the model after excludint outliers
+
+```{r}
+outlier_ids <- attr(outliers, "outlier_count")$all$Row
+
+# Remove those rows from the original dataset
+data_pos_clean <- data_pos[-outlier_ids, ]
+
+# Refit the Poisson model without the outliers
+poisson_model_refit <- glm(wwwhr ~ wordsum + age + sex + reliten + polviews + wrkhome, 
+                           data = data_pos_clean, 
+                           family = poisson)
+
+# Summarize the new model
+summary(poisson_model_refit)
+```
+
+```{r}
+model_parameters(your_model) %>%
+  print_html()
+```
+
+### Check for Overdispersion 
+
+Hint: performance package has the function you're looking for
+```{r}
+check_overdispersion(poisson_model_refit)
+```
+
+What do you notice?
+And what's a good next step forward?
+Can there be another model class that can fit the data? If so, fit this model to the data. 
+
+The dispersion ratio is very high (14.687), indicating strong overdispersion. This violates the assumptions of the Poisson model. A better model for overdispersed count data is the Negative Binomial model, which accounts for extra variance. I refit the model using glm.nb() from the MASS package.
+
+```{r}
+# Load necessary package
+library(MASS)
+
+# Fit a Negative Binomial model to account for overdispersion
+nb_model <- glm.nb(wwwhr ~ wordsum + age + sex + reliten + polviews + wrkhome, 
+                   data = data_pos_clean)
+
+# Display the summary of the model
+summary(nb_model)
+```
+
+## Which one is better- your earlier model, or later model?
+
+```{r}|
+library(performance)
+
+# Compare Poisson (refit) and Negative Binomial models
+compare_performance(poisson_model_refit, nb_model)
+```
+
+The Negative Binomial model is clearly better based on model comparison:
+- Much lower AIC (3931.5 vs. 8515.5)
+- Higher log score and spherical score
+- Correctly accounts for overdispersion
+
+## What is zero inflation? Is there zero-inflation in your chosen model?
+
+Zero inflation occurs when a dataset has more zeros than expected under a standard count model like Poisson or Negative Binomial. These “extra” zeros may come from a separate process (e.g., people who never use the internet at all, regardless of predictors).
+```{r}
+check_zeroinflation(nb_model)
+```
+The model predicts more zeros (67) than actually observed (40), with a ratio of 1.68 — indicating it's overfitting zeros.
+
+
+::: panel-tabset
+## Log Lambda
+
+```{r}
+# Extract log(λ), which is the linear predictor
+log_lambda <- predict(nb_model, type = "link")
+
+# Optional: View first few values
+head(log_lambda)
+
+# Optional: Plot the distribution
+hist(log_lambda, main = "Distribution of log(λ)", xlab = "log(λ)", col = "lightblue", breaks = 30)
+
+
+```
+
+## Mean Count
+
+```{r}
+# Get the predicted mean count (λ)
+mean_count <- predict(nb_model, type = "response")
+
+# Optional: View first few predictions
+head(mean_count)
+
+# Optional: Plot the distribution
+hist(mean_count, main = "Distribution of Predicted Counts (λ)", 
+     xlab = "Predicted Count", col = "lightgreen", breaks = 30)
+```
+:::
+
+## Report your conclusions
+
+We began by fitting a Poisson regression model to predict weekly internet usage (wwwhr). Model diagnostics revealed significant overdispersion (dispersion ratio = 14.687, p < .001), indicating that the Poisson model underestimated variance.
+
+To address this, we refit the data using a Negative Binomial model, which appropriately handles overdispersion. Model comparison showed that the Negative Binomial model had a much lower AIC and better overall fit than the Poisson model.
+
+We also tested for zero inflation. The model was found to overpredict zeros (67 predicted vs. 40 observed), so zero inflation is not a concern. Therefore, a zero-inflated model is not necessary.
+
+In conclusion, the Negative Binomial model is the best-fitting and most appropriate model for this dataset. It provides a more reliable basis for interpreting predictors of internet use.
