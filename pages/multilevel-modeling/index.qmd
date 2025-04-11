@@ -18,7 +18,11 @@ format:
   html:
     code-fold: true
     code-overflow: wrap
+params: 
+  SHOW_SOLS: TRUE
+  TOGGLE: TRUE
 engine: knitr
+
 ---
 
 ```{r}
