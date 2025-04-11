@@ -20,6 +20,8 @@ website:
         text: Multinomial Regression
       - href: pages/poisson-regression/index.qmd
         text: Poisson Regression
+      - href: pages/multilevel-modeling/index.qmd
+        text: Multilevel Modeling
       - href: about.qmd
         text: About
       
