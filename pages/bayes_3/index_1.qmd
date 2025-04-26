@@ -1,0 +1,604 @@
+---
+title: "PSY 504: Bayes Lab 3, Priors and Predictive Checks April 16th, 2025"
+format: html
+editor: visual
+---
+
+\
+During the first Bayes Lab you considered exploratory data analysis, compared default brms with lm(), and extracted posteriors after fitting models. You summarized posterior distributions and also generated a distribution of predictions using these posterior draws.\
+\
+During the second Bayes lab, you looked at the different types of distributions that are relevant for Bayesian analysis, including priors.
+
+During today's lab, you will go into prior predictive checks and some HMC diagnostics. While we look at the simple linear modeling case, this workflow is relevant for all Bayesian models.
+
+## Setup: Packages and data
+
+Load the primary packages.
+
+```{r, warning = F, message = F}
+library(tidyverse)
+library(brms)
+library(tidybayes)
+library(truncnorm)  # if needed
+```
+
+This time we'll be taking data from the **moderndive** package. We want the `evals` data set.
+
+```{r}
+data(evals, package = "moderndive")
+```
+
+The `evals` data were originally in the paper by Hamermesh and Parker (2005; <https://doi.org/10.1016/j.econedurev.2004.07.013).> You can learn more about the data like this:
+
+```{r}
+?moderndive::evals
+```
+
+You can learn even more information about the data from <https://www.openintro.org/data/index.php?data=evals.>
+
+Anyway, we need to subset the data.
+
+```{r}
+evals94 <- evals %>% 
+  group_by(prof_ID) %>% 
+  slice(1) %>% 
+  ungroup()
+
+glimpse(evals94)
+```
+
+## Intercept-only model
+
+Let's start by fitting an intercept-only model
+
+$$
+\begin{align}
+\text{bty_avg}_i & \sim \operatorname{Normal}(\mu_i, \sigma) \\
+\mu_i & = \beta_0 \\
+\beta_0 & \sim \text{???} \\
+\sigma & \sim \text{???},
+\end{align} 
+$$
+
+where $\beta_0$ is the same as the unconditional population mean, and the population standard deviation is $\sigma$. Our next task will be choosing our priors.
+
+#### Question 1: Why have we left some of the specification above unfilled / with questions marks at this point?
+
+
+- **We haven’t chosen priors yet.**  
+  Before assigning a distribution to $\beta_0$ (the population mean) or $\sigma$ (the population standard deviation), we need to think carefully about what values are reasonable given the context.
+
+- **Priors are deliberate modeling choices.**  
+  The question marks serve as a reminder that priors are not automatically determined — they must be specified based on our knowledge, assumptions, or modeling goals.
+
+### Visualize possible prior distributions.
+
+In this exercise, we'll choose the priors together. Let's start with prior on $\beta_0$. Below are a few candidate distributions visualized with **ggdist** and friends.
+
+```{r}
+c(
+  prior(normal(5.5, 1)),
+  prior(normal(8, 2)),
+  prior(normal(5.5, 2))
+) %>% 
+  parse_dist() %>% 
+
+  ggplot(aes(xdist = .dist_obj, y = prior)) + 
+  stat_halfeye(point_interval = mean_qi, .width = c(.5, .95)) +
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  labs(subtitle = "The red lines mark the lower and upper boundaries.",
+       x = expression(italic(p)(beta[0])),
+      y = NULL)
+```
+
+The red lines in the figures (shown at x=1 and x=10) represent the lower and upper boundaries for the beauty ratings scale used in the study. With the simple intercept model, setting a prior on the intercept parameter is the same as setting a prior on the expected mean in observation space.
+
+Now let's visualize a few potential priors for $\sigma$.
+
+```{r}
+c(
+  prior(exponential(1)), 
+  prior(normal(0, 1), lb = 0), 
+  prior(normal(2, 0.3), lb = 0)
+) %>% 
+  parse_dist() %>% 
+  
+  ggplot(aes(xdist = .dist_obj, y = prior)) + 
+  stat_halfeye(point_interval = mean_qi, .width = c(.5, .95)) +
+  xlab(expression(italic(p)(sigma))) +
+  ylab(NULL)
+```
+
+#### Question 2: Given that $\sigma$ refers to the standard deviation, are these three priors theoretically possible? If yes, give an example of a theoretically impossible prior for $\sigma$.
+
+| Prior specification | Theoretically valid? | Reason |
+| --- | --- | --- |
+| `prior(exponential(1))` | **Yes** | The exponential distribution’s support is (0, ∞), matching the requirement that $\sigma > 0$. |
+| `prior(normal(0, 1), lb = 0)` | **Yes** | The normal is **truncated** at 0 (`lb = 0`), so only positive values remain. |
+| `prior(normal(2, 0.3), lb = 0)` | **Yes** | Same logic: truncation keeps the support strictly positive. |
+
+A **theoretically impossible** prior for a standard deviation would assign any probability mass to non-positive values. For example:
+
+```r
+prior(normal(0, 1))   # un-truncated: ~50 % of its mass lies at σ ≤ 0
+```
+
+### Prior-predictive checks (by hand).
+
+Note: It's possible we'll need the `truncnorm::rtruncnorm()` function in this section. Once we have candidate priors for both $\beta_0$ and $\sigma$, we can simulate values from those priors and plot the implied distributions.
+
+```{r}
+# how many distributions do you want?
+n <- 50
+
+# do you want to make the simulation reproducible?
+# set.seed(1)
+
+# simulate values from the priors
+tibble(iter = 1:n,
+       # choose the hyperparameter values with the class
+       beta0 = rnorm(n = n, mean = 5.5, sd = 1),
+       sigma = rexp(n = n, rate = 1 / 1)) %>% 
+  expand_grid(bty_avg = seq(from = -2, to = 13, by = 0.025)) %>% 
+  mutate(density = dnorm(x = bty_avg, mean = beta0, sd = sigma)) %>% 
+  
+  # plot!
+  ggplot(aes(x = bty_avg, y = density, group = iter)) +
+  geom_line(linewidth = 1/3, alpha = 1/2) +
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  coord_cartesian(xlim = c(-1, 12),
+                  ylim = c(0, 3)) +
+  labs(subtitle = expression("Prior predictive distributions based on "*italic(p)(beta[0])~and~italic(p)(sigma)))
+```
+
+The simulated values constitute predictions that are made using our prior beliefs (a prior is set for beta0 and another for sigma) When you check if these predictions (prior predictive) make sense or not, it is called the prior predictive check. The point of the prior predictive check is to iterate on specifying the priors until the prior predictive is sensible/satisfactory.
+
+(Again, the red boundaries denote that the only possible bty_avg values are between 1 and 10.)
+
+#### Question 3: Can Explain what the section of the previous command, before ggplot is doing?
+
+1. Set the number of prior draws
+
+```r
+n <- 50
+```
+
+We plan to draw 50 candidate parameter pairs \((\beta_0, \sigma)\) from the priors.
+
+---
+
+2. Draw samples from the priors
+
+```r
+tibble(
+  iter  = 1:n,                         # label each draw
+  beta0 = rnorm(n, mean = 5.5, sd = 1),# β₀  ~ Normal(5.5, 1)
+  sigma = rexp(n, rate = 1/1)          # σ   ~ Exponential(λ = 1)
+)
+```
+This creates a table with 50 rows, each containing one simulate intercept (`beta0`) and one simulated standard deviation (`sigma`).
+
+  ---
+
+3. Expand to a grid of \(x\)-values
+
+```r
+%>% expand_grid(bty_avg = seq(-2, 13, 0.025))
+```
+For every prior draw, attach a column `bty_avg` that ranges from –2 t13 (step 0.025).
+This produces a grid covering the whole rating scale (and a bit extra).
+
+---
+
+4. Compute the normal density for each point
+
+```r
+%>% mutate(density = dnorm(bty_avg, mean = beta0, sd = sigma))
+```
+Treating each \((\beta_0, \sigma)\) pair as the parameters of a Normadistribution,
+evaluate that Normal’s PDF at every `bty_avg` value.
+
+---
+
+**Result:** a long data frame containing  
+`iter`, `beta0`, `sigma`, `bty_avg`, and the corresponding `density`.  
+Each `iter` represents one entire prior-predictive curve; these are what get plotted in `ggplot`.
+
+### Fit the model that you prefer
+
+We should practice writing out our model equation with our priors of choice:
+
+$$
+\begin{align}
+\text{bty_avg}_i & \sim \operatorname{Normal}(\mu_i, \sigma) \\
+\mu_i & = \beta_0 \\
+\beta_0 & \sim \text{Normal}(5.5,\,1) \qquad\text{(prior on the class-level mean)}\\
+\sigma & \sim \text{Exponential}(1) \qquad\text{(prior on the s.d.)}
+\end{align}
+$$
+
+Let's fit a model with our priors of choice.
+
+```{r fit9.b, results = "hide"}
+fit9.b = brm(
+  data = evals94,
+  family = gaussian,
+  bty_avg ~ 1,
+  # make sure we're settled on our priors 
+  # we don't need to use these; they're placeholders
+  prior  = prior(normal(5.5, 1), class = Intercept) +   # p(β₀)
+           prior(exponential(1), class = sigma)         # p(σ)
+)
+```
+
+Check the model summary.
+
+```{r}
+summary(fit9.b)
+```
+
+Now we might do a posterior predictive check to see how well our model describes the data.
+
+```{r}
+set.seed(1)
+pp_check(fit9.b, ndraws = 100) +
+  ggtitle("posterior predictive check")
+
+set.seed(2)
+pp_check(fit9.b, ndraws = 8,
+         type = "hist", binwidth = 0.5) +
+  # yes, we can add our red lines to our pp-check
+  geom_vline(xintercept = c(1, 10), color = "red")  +
+  ggtitle("posterior predictive check")
+```
+
+Our simple Gaussian model doesn't do a great job respecting the lower and upper boundaries, but this is about as good as it gets when you're in Gaussian land. On the whole, the model did a pretty okay reproducing the gross features of the distribution of the sample data.
+
+#### Question 5: To ensure you've understood things well, can you write below about the difference between the prior predictive check and the posterior predictive check? How do they differ in their objectives?
+
+| Aspect | **Prior predictive check** | **Posterior predictive check** |
+| --- | --- | --- |
+| **What is simulated?** | Data generated from the *prior* distributions alone: draw parameters from the priors, then generate “fake” data. | Data generated from the *posterior* distributions: draw parameters from the posterior, then generate “replicated” data. |
+| **When is it done?** | **Before fitting** the model (i.e., before seeing or conditioning on the real data). | **After fitting** the model and updating priors with the observed data. |
+| **Main objective** | • Ask: *“If my priors were true, would they produce data that look remotely plausible?”*  
+• Detect priors that imply absurd values (e.g., beauty scores < 1 or > 10).  
+• Guide iterative refinement of priors *without* peeking at the data. | • Ask: *“Given my fitted model, can it recreate the salient features of the observed data?”*  
+• Diagnose model mis-fit, unmodelled structure, or boundary issues.  
+• Evaluate predictive adequacy and whether residual patterns remain. |
+| **Data used** | Priors only (no information from the observed sample). | Both priors **and** likelihood (information has been updated by the data). |
+| **Typical outcome** | Decide whether to keep, tighten, re-centre, or otherwise adjust priors. | Decide whether to refine the likelihood, add predictors, change link, use a different distribution, etc. |
+
+In short:
+
+* **Prior predictive check** = sanity-check your *assumptions* **before** the data influence the model.  
+* **Posterior predictive check** = sanity-check your *model’s fit* **after** learning from the data.
+
+## Prior-predictive checks (by `sample_prior = "only"`)
+
+We can also sample from the prior predictive distribution from `brm()` itself. To do so, we use the `sample_prior` argument, which has the following options:
+
+-   `"no"`, which is the default, and does not sample from the prior;
+-   `"yes",`, which will sample from both the prior and the posterior; and
+-   `"only"`, which will only sample from the prior.
+
+Let's set `sample_prior = "only"`.
+
+```{r fit10.b, results = "hide"}
+# check to see if we want to use other priors
+
+fit10.b = brm(
+  data = evals94,
+  family = gaussian,
+  bty_avg ~ 1,
+  prior = prior(normal(5.5, 1), class = Intercept) +
+    prior(exponential(1), class = sigma),
+  # here's the magic
+  sample_prior = "only",
+  # we can set our seed, too!
+  seed = 1
+)
+```
+
+Did you notice how we used the `seed` argument? This makes the results reproducible.
+
+Now the `summary()` function only returns summaries for the priors, NOT the posterior.
+
+```{r}
+summary(fit10.b)  # this summarizes the prior
+```
+
+The `as_draws_df()` function also returns draws from the prior.
+
+```{r}
+as_draws_df(fit10.b) %>% 
+  head()
+```
+
+Here's how we might use that `as_draws_df()` output to make a similar plot to the one we made before.
+
+```{r}
+# how many distributions do you want?
+n <- 50
+
+# do you want to make the results reproducible?
+# set.seed(1)
+
+as_draws_df(fit10.b) %>% 
+  
+  # subset
+  slice_sample(n = n) %>% 
+  expand_grid(bty_avg = seq(from = -2, to = 13, by = 0.025)) %>% 
+  # notice we're defining the mean by b_Intercept
+  mutate(density = dnorm(x = bty_avg, mean = b_Intercept, sd = sigma)) %>% 
+  
+  ggplot(aes(x = bty_avg, y = density, 
+             # notice we're grouping by .draw
+             group = .draw)) +
+  geom_line(linewidth = 1/3, alpha = 1/2) +
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  coord_cartesian(xlim = c(-1, 12),
+                  ylim = c(0, 3)) +
+  labs(subtitle = expression("Prior predictive distributions based on "*italic(p)(beta[0])~and~italic(p)(sigma)))
+```
+
+We can also use functions like `pp_check()` to compare the prior to the sample data.
+
+```{r}
+set.seed(1)
+pp_check(fit10.b, ndraws = 100) +
+  coord_cartesian(xlim = c(-1, 12),
+                  ylim = c(0, 3)) +
+  ggtitle("prior predictive check")
+
+set.seed(2)
+pp_check(fit10.b, ndraws = 8,
+         type = "hist", binwidth = 0.5) +
+  # yes, we can add our red lines to our pp-check
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  ggtitle("prior predictive check")
+```
+
+## Univariable predictor model
+
+Now we'll add `gender` as the sole predictor in the model,
+
+$$
+\begin{align}
+\text{bty_avg}_i & \sim \operatorname{Normal}(\mu_i, \sigma) \\
+\mu_i & = \beta_0 + \beta_1 \text{gender}_i \\
+\beta_0 & \sim \text{???} \\
+\beta_1 & \sim \text{???} \\
+\sigma & \sim \text{???}.
+\end{align}
+$$
+
+Let's try these same set of $\beta_0$ priors
+
+```{r}
+# change as needed
+
+c(
+  prior(normal(5.5, 1)),
+  prior(normal(7, 0.5)),
+  prior(normal(5.5, 2))
+) %>% 
+  parse_dist() %>% 
+  
+  ggplot(aes(xdist = .dist_obj, y = prior)) + 
+  stat_halfeye(point_interval = mean_qi, .width = c(.5, .95)) +
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  labs(subtitle = "The red lines mark the lower and upper bondaries.",
+       x = expression(italic(p)(beta[0])),
+      y = NULL)
+```
+
+Now we update our by-hand prior predictive simulation to accomodate $\beta_0$ and $\beta_1$.
+
+```{r}
+n <- 50
+
+set.seed(1)
+
+tibble(iter = 1:n,
+       beta0 = rnorm(n = n, mean = 5.5, sd = 1),
+       # notice our new line
+       beta1 = rnorm(n = n, mean = 0, sd = 1),
+       sigma = rexp(n = n, rate = 1 / 1)) %>% 
+  # we have a new expand_grid() line
+  # make sure everyone understands this coding scheme
+  expand_grid(gendermale = 0:1) %>% 
+  expand_grid(bty_avg = seq(from = -2, to = 13, by = 0.025)) %>% 
+  # notice the updated mean formula
+  mutate(density = dnorm(x = bty_avg, 
+                         mean = beta0 + beta1 * gendermale, 
+                         sd = sigma)) %>% 
+  
+  # plot!
+  ggplot(aes(x = bty_avg, y = density, group = iter)) +
+  geom_line(linewidth = 1/3, alpha = 1/2) +
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  coord_cartesian(xlim = c(-1, 12),
+                  ylim = c(0, 3)) +
+  labs(subtitle = expression("Prior predictive distributions based on "*italic(p)(beta[0])~ and~italic(p)(beta[1])~and~italic(p)(sigma))) +
+  facet_wrap(~ gendermale, labeller = label_both)
+```
+
+Before we fit the model, let's practice the `sample_prior = "only"` approach.
+
+```{r fit11.b, results = "hide"}
+# check to see if we want to use other priors
+
+fit11.b = brm(
+  data = evals94,
+  family = gaussian,
+  # notice the 0 + Intercept syntax
+  bty_avg ~ 0 + Intercept + gender,
+  prior = prior(normal(5.5, 1), class = b, coef = Intercept) +
+    prior(normal(0, 1), class = b, coef = gendermale) +
+    prior(exponential(1), class = sigma),
+  # here's the magic
+  sample_prior = "only",
+  seed = 2
+)
+```
+
+Check the prior summary.
+
+```{r}
+summary(fit11.b)
+```
+
+Compare the prior with the data with `pp_check()`.
+
+```{r}
+set.seed(1)
+pp_check(fit11.b, 
+         type = "dens_overlay_grouped",
+         group = "gender",
+         ndraws = 100) +
+  coord_cartesian(xlim = c(-1, 12),
+                  ylim = c(0, 3)) +
+  ggtitle("prior predictive check")
+
+set.seed(2)
+pp_check(fit11.b, ndraws = 5,
+         type = "freqpoly_grouped", group = "gender") +
+  # yes, we can add our red lines to our pp-check
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  ggtitle("prior predictive check")
+```
+
+There isn't a great grouped histogram option for `pp_check()`, so we experimented with `type = "freqpoly_grouped"` instead.
+
+If we wanted, we could also use the `predict()` function to simulate `bty_avg` values from the priors.
+
+```{r}
+# walk through this slowly
+
+set.seed(1)
+
+predict(fit11.b,
+        summary = FALSE,
+        ndraws = 5) %>% 
+  str()
+```
+
+```{r}
+# customize the predictor grid, as desired
+nd <- tibble(gender = rep(c("female", "male"), each = 50)) %>% 
+  # this will make it easier to connect the nd data to the predict() output
+  mutate(row = 1:n())
+
+set.seed(1)
+
+predict(fit11.b,
+        newdata = nd,
+        summary = FALSE,
+        ndraws = 5) %>% 
+  data.frame() %>% 
+  mutate(draw = 1:n()) %>% 
+  pivot_longer(-draw) %>% 
+  mutate(row = str_remove(name, "X") %>% as.double()) %>% 
+  left_join(nd, by = "row") %>% 
+  
+  ggplot(aes(x = value)) +
+  geom_histogram(binwidth = 0.5, boundary = 1) +
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  facet_grid(draw ~ gender, labeller = label_both)
+```
+
+Once we've settled on our priors, we should once again practice writing out the full model equation:
+
+$$
+\begin{align}
+\text{bty_avg}_i & \sim \operatorname{Normal}(\mu_i, \sigma) \\
+\mu_i & = \beta_0 + \beta_1 \text{gender}_i \\
+\beta_0 & \sim \text{<put distribution here>} \\
+\beta_1 & \sim \text{<put distribution here>} \\
+\sigma & \sim \text{<put distribution here>}.
+\end{align}
+$$
+
+Okay, let's fit the real model.
+
+```{r fit12.b, results = "hide"}
+# check to see if we want to use other priors
+
+fit12.b = brm(
+  data = evals94,
+  family = gaussian,
+  bty_avg ~ 0 + Intercept + gender,
+  prior = prior(normal(5.5, 1), class = b, coef = Intercept) +
+    prior(normal(0, 1), class = b, coef = gendermale) +
+    prior(exponential(1), class = sigma),
+  
+  # yes, you can set your seed for your posteriors, too
+  # this makes the results reproducible
+  seed = 3
+)
+```
+
+Check the model summary.
+
+```{r}
+summary(fit12.b)
+```
+
+How does the posterior-predictive check look?
+
+```{r}
+set.seed(1)
+pp_check(fit12.b, 
+         type = "dens_overlay_grouped",
+         group = "gender",
+         ndraws = 100) +
+  coord_cartesian(xlim = c(-1, 12)) +
+  ggtitle("posterior predictive check")
+
+set.seed(2)
+pp_check(fit12.b, ndraws = 5,
+         type = "freqpoly_grouped", group = "gender") +
+  # yes, we can add our red lines to our pp-check
+  geom_vline(xintercept = c(1, 10), color = "red") +
+  ggtitle("prior predictive check")
+```
+
+#### Question 6: Does the posterior predictive check look satsifactory to you?
+
+1. Overall fit to the bulk of the data**  
+  The light-blue posterior replications (`y_rep`) track the dark-blue observed densities (`y`) fairly closely for both *female* and *male*.  Means and general spread appear well-captured, so the model reproduces the main shape of each group’s distribution.
+
+2. Boundary behaviour (1 – 10 scale)
+  In some of the plot the tail of simulated values still leaks beyond the theoretical limits (red vertical lines).
+  * But those draws are rare and of small magnitude, this might be tolerable.  
+
+3. Within-group variability
+  The width of the simulated curves looks similar to the data, suggesting that the posterior for σ is reasonable.  No obvious over- or under-dispersion is evident.
+
+Overall
+The check is “good-enough” for central tendencies and gender differences but not perfect at the boundaries.  
+
+
+::: callout-note
+For more on prior predictive checks, see McElreath (from Chapter 4), and Solomon Kurz's brms/tidverse implementations as well.
+
+For a comprehensive guide to set priors for a given situation, look at reccomendations made by the Stan team https://github.com/stan-dev/stan/wiki/prior-choice-recommendations
+
+They generally recommend against uniform priors on $\beta$ and $\sigma$ parameters. This is based on a general principle that you should not use a prior that places an artificial boundary on a parameter.
+
+E.g. $\sigma$ parameters have natural lower boundaries at zero, but they don't have upper boundaries. Thus, a uniform prior adds an unnatural upper boundary. A better prior would be something that is weakly informative
+:::
+
+## References
+
+Hamermesh, D. S., & Parker, A. (2005). Beauty in the classroom: Instructors' pulchritude and putative pedagogical productivity. *Economics of Education Review, 24*(4), 369-376. https://doi.org/10.1016/j.econedurev.2004.07.013
+
+Kurz, A. S. (2023). *Statistical Rethinking with brms, ggplot2, and the tidyverse: Second Edition* (version 0.4.0). https://bookdown.org/content/4857/
+
+McElreath, R. (2020). *Statistical rethinking: A Bayesian course with examples in R and Stan* (Second Edition). CRC Press. https://xcelab.net/rm/statistical-rethinking/
+
+## Session information
+
+```{r}
+sessionInfo()
+```
