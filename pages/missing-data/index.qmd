@@ -1,0 +1,249 @@
+---
+title: "Missing_Data_Lab"
+format: html
+editor: visual
+---
+
+Missing data is a common problem and dealing with it appropriately is extremely important. Ignoring the missing data points or filling them incorrectly may cause the models to work in unexpected ways and cause the predictions and inferences to be biased.
+
+Le'ts consider built-in dataset 'airquality' in R as a sample dataset.
+
+```{r}
+# Load the airquality dataset
+data("airquality")
+```
+
+#### Question 1:
+
+(a) Examine this dataset for missing values. While there are many ways to do this, the skim function from the library 'skimr' is elegant;
+
+```{r}
+# Load the skimr package
+library(skimr)
+# Use skim to examine the airquality dataset
+skim(airquality)
+```
+
+(b) use the nanair package to visualize missing values
+```{r}
+# Load the naniar package
+library(naniar)
+# Visualize missing values in the airquality dataset
+gg_miss_var(airquality)
+```
+
+(c) even though it's hard to confirm based on visualizations alone, what do your visualizations lead you to believe about the missing data being MCAR, MAR, or MNAR?
+
+-   MCAR: Missing completely at random. The missingness is unrelated to the observed data or the missing data itself.
+-   MAR: Missing at random. The missingness is related to the observed data but not the missing data itself.
+-   MNAR: Missing not at random. The missingness is related to the missing data itself.
+
+The pattern in the plot "rules out" MCAR.
+The missingness is concentrated in Ozone and to a lesser extent Solar.R, while the other four variables have no gaps at all. That clustering strongly suggests the data are not MCAR. Whether the mechanism is MAR or MNAR can’t be settled from this plot alone, but MAR is the more defensible working assumption.
+
+(d) Carry out Little's statistical test to evaluate MCAR and report results.
+```{r}
+# Perform Little's MCAR test
+mcar_test_result <- mcar_test(airquality)
+# Print the result
+print(mcar_test_result)
+```
+
+
+We performed Little’s MCAR test using the `naniar` package.
+
+- Chi-square = 35.1
+- Degrees of freedom = 14
+- p-value** 0.00142
+- Number of missingness patterns = 4
+
+
+Since the p-value is much smaller than 0.05, we reject the null hypothesis that the missing data are Missing Completely at Random (MCAR).  
+Thus, the missingness in the `airquality` dataset is not MCAR.  
+It is likely either MAR or MNAR.
+
+(e) Creating a binary indicator for missingness allows you to test whether the presence of missing data is related to observed data.
+
+    -   For instance, you can create a dummy variable: 1 = Missing; 0 = Observed.
+    -   Next you can conduct a chi-square test or t-test:
+        -   Chi-square: Compare proportions of missingness ***across groups***.
+        -   T-test: Compare means of (other) observed variables with missingness indicators.
+
+```{r}
+library(tidyverse)
+library(broom)      # for tidy() output
+library(naniar)     # already loaded earlier
+
+## 1  Add binary indicators (1 = missing, 0 = observed)
+air_miss <- airquality %>% 
+  mutate(
+    miss_Ozone   = as.integer(is.na(Ozone)),
+    miss_SolarR  = as.integer(is.na(Solar.R))
+  )
+
+## 2a  χ² test :  Does Ozone missingness vary by Month?
+chisq_tbl  <- table(air_miss$miss_Ozone, air_miss$Month)
+chisq_res  <- chisq.test(chisq_tbl)
+
+## 2b  t-test :  Does Temperature differ between rows with / without Ozone?
+ttest_res  <- t.test(Temp ~ miss_Ozone, data = air_miss, var.equal = FALSE)
+
+## 3  Tidy summaries
+chisq_tidy <- tidy(chisq_res)
+ttest_tidy <- tidy(ttest_res)
+
+list(
+  "Chi-square test (Ozone missingness × Month)" = chisq_tidy,
+  "T-test (Temperature ~ Ozone missingness)"    = ttest_tidy
+)
+```
+
+- The strong χ² result rules out MCAR: missingness is systematically related to the month of observation.  
+- Because the dependence is on an observed variable (Month) rather than the unobserved Ozone values themselves, the pattern is consistent with MAR.  
+- Temperature does not appear to explain missingness (p ≈ 1), so it needn’t be included as a predictor in the imputation model for that purpose.
+
+Conclusion: 
+The missing‐data mechanism for *Ozone* (and, by extension, *Solar.R*) is best treated as MAR.  
+
+#### Question 2:
+
+Create **new and appropriately named datasets** that are based on airquality for each of the following ways of fixing the dataset:
+
+    
+(a) "listwise deletion" or "complete case analysis" --- where entire records from the analysis are removed if they are missing any data point in one or more variables 
+```{r}
+dataset_listwise_deletion <- airquality %>% 
+  filter(complete.cases(.))
+```
+
+(b) Imputation with mean --- involves filling in the missing values with the mean of the available values in the same variable.
+```{r}
+dataset_mean_imputation <- airquality %>% 
+  mutate(
+    Ozone   = if_else(is.na(Ozone),   mean(Ozone,   na.rm = TRUE), Ozone),
+    Solar.R = if_else(is.na(Solar.R), mean(Solar.R, na.rm = TRUE), Solar.R)
+  )
+```
+  
+- (c) Imputation with regression (use mice package)
+```{r}
+library(mice)
+meth_reg <- c(
+  Ozone   = "norm",   # Bayesian linear regression (adds residual noise)
+  Solar.R = "norm",
+  Wind    = "", Temp = "", Month = "", Day = ""
+)
+
+imp_reg <- mice(
+  data   = airquality,
+  m      = 1,          # single completed data set
+  method = meth_reg,
+  maxit  = 5,
+  seed   = 123
+)
+
+dataset_regression_imputation <- complete(imp_reg, 1)
+```
+- (d) Imputation with stochastic regression (use mice package)
+```{r}
+meth_stoch <- c(
+  Ozone   = "norm.nob",   # regression without added noise
+  Solar.R = "norm.nob",
+  Wind    = "", Temp = "", Month = "", Day = ""
+)
+
+imp_stoch <- mice(
+  data   = airquality,
+  m      = 1,
+  method = meth_stoch,
+  maxit  = 5,
+  seed   = 123
+)
+
+dataset_stochastic_regression_imputation <- complete(imp_stoch, 1)
+```
+
+  - (e) Imputation with multiple induction (use mice package, 5 imputations, and Predictive mean matching method)
+
+
+```{r}
+meth_pmm <- c(
+  Ozone   = "pmm",   # predictive mean matching
+  Solar.R = "pmm",
+  Wind    = "", Temp = "", Month = "", Day = ""
+)
+
+imp_pmm <- mice(
+  data   = airquality,
+  m      = 5,        # five imputed data sets
+  method = meth_pmm,
+  maxit  = 5,
+  seed   = 123
+)
+
+# One way to extract all five completed data sets in long format
+datasets_multiple_imputation <- complete(imp_pmm, action = "long")
+```
+
+#### Question 3:
+
+Compare the eventual distribution from these datasets on the variable 'Ozone'against the orgiinal. Below is a template that considers only 2 datasets but please consider all the datasets you generated within a single plot
+
+```{r}
+library(tidyverse)
+plot_data <- bind_rows(
+  airquality %>% 
+    select(Ozone) %>% 
+    mutate(Source = "Original"),
+  
+  dataset_listwise_deletion %>% 
+    select(Ozone) %>% 
+    mutate(Source = "Listwise deletion"),
+  
+  dataset_mean_imputation %>% 
+    select(Ozone) %>% 
+    mutate(Source = "Mean imputation"),
+  
+  dataset_regression_imputation %>% 
+    select(Ozone) %>% 
+    mutate(Source = "Regression imputation"),
+  
+  dataset_stochastic_regression_imputation %>% 
+    select(Ozone) %>% 
+    mutate(Source = "Stochastic regression"),
+  
+  # five predictive-mean-matching data sets (PMM 1–5)
+  complete(imp_pmm, action = "long") %>%           # .imp column = 1 … 5
+    select(.imp, Ozone) %>% 
+    mutate(Source = paste0("PMM ", .imp)) %>% 
+    select(-.imp)
+)
+
+# -------------------------------------------------------------------
+# 2.  Plot all density curves together
+# -------------------------------------------------------------------
+
+ggplot(plot_data, aes(x = Ozone, colour = Source, fill = Source)) +
+  geom_density(alpha = 0.25, adjust = 1) +
+  labs(
+    title  = "Density of Ozone: Original vs. Imputed data sets",
+    x      = "Ozone",
+    y      = "Density",
+    colour = "Data set",
+    fill   = "Data set"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+What do you observe?
+
+Mean imputation is clearly the worst—it destroys variability and is visually obvious.
+
+List-wise deletion changes the shape subtly; given missingness depends on Month, it is likely biased.
+
+Regression imputations (deterministic and stochastic) do better than mean replacement but still damp the tails.
+
+Predictive mean matching (PMM) is the closest to the original distribution and the best choice here, especially when combined with multiple imputation so that between-imputation variability is captured.
+
+#### Of course, each dataset you produced will lead to different modeling results, but we won't go into that in today's lab.
