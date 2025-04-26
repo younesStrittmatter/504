@@ -22,6 +22,8 @@ website:
         text: Poisson Regression
       - href: pages/multilevel-modeling/index.qmd
         text: Multilevel Modeling
+      - href: pages/bayes/index.qmd
+        text: Bayes 1
       - href: about.qmd
         text: About
       
